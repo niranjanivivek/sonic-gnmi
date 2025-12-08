@@ -2,7 +2,6 @@ package gnmi
 
 import (
 	"fmt"
-	"github.com/Azure/sonic-mgmt-common/translib/db"
 	"github.com/go-redis/redis/v7"
 	log "github.com/golang/glog"
 	sdcfg "github.com/sonic-net/sonic-gnmi/sonic_db_config"
@@ -22,9 +21,7 @@ var (
 	dbWriteMutex sync.Mutex
 
 	// --- Dependency Injection Variables ---
-	getRedisDBClientFunc         = getRedisDBClient
-	closeRedisClientFunc         = db.CloseRedisClient
-	transactionalRedisClientFunc = db.TransactionalRedisClientWithOpts
+	getRedisDBClientFunc = getRedisDBClient
 
 	// Functional dependencies for specific *redis.Client methods, now returning just error.
 	redisHSetFunc = func(c *redis.Client, key string, fields ...interface{}) error {
@@ -47,7 +44,7 @@ func writeCredentialsMetadataToDB(tbl, key, fld, val string) error {
 		log.V(0).Info(err.Error())
 		return fmt.Errorf("REDIS is not available: %v", err)
 	}
-	defer closeRedisClientFunc(sc)
+	sc.Close()
 
 	// Write metadata.
 	path := getKey([]string{credentialsTbl, tbl})
@@ -70,7 +67,7 @@ func getRedisDBClient(dbName string) (*redis.Client, error) {
 	ns, _ := getDbDefaultNamespaceFunc()
 	addr, _ := getDbTcpAddrFunc(dbName, ns)
 	id, _ := getDbIdFunc(dbName, ns)
-	rclient := transactionalRedisClientFunc(&redis.Options{
+	rclient := redis.NewClient(&redis.Options{
 		Network:     "tcp",
 		Addr:        addr,
 		Password:    "", // no password set
